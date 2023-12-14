@@ -45,8 +45,6 @@ async def positions(ctx, user_address: str):
     else:
         await ctx.send("Failed to fetch asset positions.")
 
-
-
 @commands.command(name='recentorders', help='Display the most recent 5 or fewer open orders')
 async def recentorders(ctx, user_address: str):
     open_orders = info.open_orders(user_address)
@@ -54,11 +52,23 @@ async def recentorders(ctx, user_address: str):
     if open_orders:
         df_open_orders = pd.DataFrame(open_orders)
 
-        # Convert 'timestamp' to a readable format
+        # Convert 'timestamp' to a readable format and rename columns
         df_open_orders['timestamp'] = pd.to_datetime(df_open_orders['timestamp'], unit='ms')
 
+        # Rename columns to more descriptive names
+        df_open_orders.rename(columns={
+            'coin': 'Coin',
+            'limitPx': 'Limit Price',
+            'oid': 'Order ID',
+            'origSz': 'Original Size',
+            'reduceOnly': 'Reduce Only',
+            'side': 'Side',
+            'sz': 'Size',
+            'timestamp': 'Timestamp'
+        }, inplace=True)
+
         # Convert to numeric and round, handling non-numeric values
-        numeric_columns = ['limitPx', 'origSz', 'sz']
+        numeric_columns = ['Limit Price', 'Original Size', 'Size']
         for column in numeric_columns:
             df_open_orders[column] = pd.to_numeric(df_open_orders[column], errors='coerce').round(2)
 
@@ -66,6 +76,7 @@ async def recentorders(ctx, user_address: str):
         await ctx.send(f"Recent Open Orders:\n```\n{recent_orders_str}\n```")
     else:
         await ctx.send("Failed to fetch open orders.")
+
 
 
 @commands.command(name='allprices', help='Display current prices of all coins')
@@ -105,34 +116,25 @@ async def userfills(ctx, user_address: str):
 
 
 
-@commands.command(name='recentorders', help='Display the most recent 5 or fewer open orders')
-async def recentorders(ctx, user_address: str):
-    open_orders = info.open_orders(user_address)
+@commands.command(name='fundingrates', help='Display the funding rates for the current day')
+async def fundingrates(ctx, coin: str):
+    coin = coin.upper()  # Convert coin to uppercase
+    start_of_day = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    end_of_day = start_of_day + datetime.timedelta(days=1)
 
-    if open_orders:
-        df_open_orders = pd.DataFrame(open_orders)
+    start_timestamp = int(start_of_day.timestamp() * 1000)
+    end_timestamp = int(end_of_day.timestamp() * 1000)
 
-        # Convert 'timestamp' to a readable format and rename columns
-        df_open_orders['timestamp'] = pd.to_datetime(df_open_orders['timestamp'], unit='ms')
+    funding_history = info.funding_history(coin, start_timestamp, end_timestamp)
 
-        # Rename columns to more descriptive names
-        df_open_orders.rename(columns={
-            'coin': 'Coin',
-            'limitPx': 'Limit Price',
-            'oid': 'Order ID',
-            'origSz': 'Original Size',
-            'reduceOnly': 'Reduce Only',
-            'side': 'Side',
-            'sz': 'Size',
-            'timestamp': 'Timestamp'
-        }, inplace=True)
+    if funding_history:
+        # Call utility function to create heatmap
+        heatmap_image = create_funding_rates_heatmap(funding_history)
 
-        # Convert to numeric and round, handling non-numeric values
-        numeric_columns = ['Limit Price', 'Original Size', 'Size']
-        for column in numeric_columns:
-            df_open_orders[column] = pd.to_numeric(df_open_orders[column], errors='coerce').round(2)
-
-        recent_orders_str = df_open_orders.to_string(index=False)
-        await ctx.send(f"Recent Open Orders:\n```\n{recent_orders_str}\n```")
+        # Save the plot to a BytesIO object
+        with io.BytesIO() as image_binary:
+            heatmap_image.savefig(image_binary, format='PNG')
+            image_binary.seek(0)
+            await ctx.send(f"Funding Rates for {coin} on {start_of_day.date()}:", file=discord.File(fp=image_binary, filename='heatmap.png'))
     else:
-        await ctx.send("Failed to fetch open orders.")
+        await ctx.send(f"Failed to fetch funding rates for {coin}.")
