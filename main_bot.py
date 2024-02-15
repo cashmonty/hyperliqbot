@@ -2,8 +2,8 @@ import discord
 from discord.ext import commands
 import os
 from dotenv import load_dotenv
-from commands import positions, recentorders, allprices, userfills, fundingrates
-
+from commands import basischart, positions, recentorders, allprices, userfills, fundingrates, fundingchart
+from utils import fetch_and_save_rates
 import commands as my_commands  # Import your commands
 
 # Load environment variables
@@ -23,10 +23,13 @@ bot.add_command(recentorders)
 bot.add_command(allprices)
 bot.add_command(userfills)
 bot.add_command(fundingrates)
-
+bot.add_command(basischart)
+bot.add_command(fundingchart)
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    bot.loop.create_task(fetch_and_save_rates())
+
 
 # Run the bot
 bot.run(bot_token)

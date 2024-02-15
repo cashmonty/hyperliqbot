@@ -8,7 +8,7 @@ import pandas as pd
 import json
 import matplotlib.pyplot as plt
 import io
-from utils import create_funding_rates_heatmap, display_recent_open_orders
+from utils import create_funding_rates_heatmap, display_recent_open_orders, fetch_and_save_rates
 
 # Initialize the API client
 info = Info(constants.MAINNET_API_URL, skip_ws=True)
@@ -112,7 +112,45 @@ async def userfills(ctx, user_address: str):
     else:
         await ctx.send(f"Failed to fetch fills for {user_address}.")
 
-
+import datetime
+import pandas as pd
+import json
+import matplotlib.pyplot as plt
+import io
+import discord
+@commands.command(name='basischart', help='Display the basis rates for the current day')
+async def basischart(ctx):
+    now = datetime.datetime.now()
+    one_hour_ago = now - datetime.timedelta(hours=1)
+    
+    # Load historical data from CSV
+    historical_df = pd.read_csv('historical_data.csv', parse_dates=['timestamp'])
+    
+    # Filter for data within the last hour
+    last_hour_df = historical_df[(historical_df['timestamp'] >= one_hour_ago) & (historical_df['timestamp'] <= now)]
+    
+    # Calculate the 10 lowest basis rates within the last hour
+    lowest_basis_rates = last_hour_df.groupby('name')['premium'].last().nsmallest(10)
+    lowest_10_names = lowest_basis_rates.index.tolist()
+    
+    # Plotting
+    plt.figure(figsize=(12, 8))
+    for name in lowest_10_names:
+        coin_data = last_hour_df[last_hour_df['name'] == name]
+        plt.plot(coin_data['timestamp'], coin_data['premium'], label=name, linestyle='-')
+    
+    plt.xlabel('Time')
+    plt.ylabel('Basis Rate')
+    plt.title('Lowest 10 Basis Rates Over Last Hour')
+    plt.xticks(rotation=45)
+    plt.legend(title='Coin')
+    plt.tight_layout()
+    
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    await ctx.send(file=discord.File(fp=buffer, filename='basis_rates.png'))
+    plt.close()
 
 
 
@@ -138,3 +176,38 @@ async def fundingrates(ctx, coin: str):
             await ctx.send(f"Funding Rates for {coin} on {start_of_day.date()}:", file=discord.File(fp=image_binary, filename='heatmap.png'))
     else:
         await ctx.send(f"Failed to fetch funding rates for {coin}.")
+import asyncio
+
+@commands.command(name='fundingchart', help='Display the funding rates for the current day')
+async def fundingchart(ctx):
+    now = datetime.datetime.now()
+    one_hour_ago = now - datetime.timedelta(hours=1)
+    
+    # Load historical data from CSV
+    historical_df = pd.read_csv('historical_data.csv', parse_dates=['timestamp'])
+    
+    # Filter for data within the last hour
+    last_hour_df = historical_df[(historical_df['timestamp'] >= one_hour_ago) & (historical_df['timestamp'] <= now)]
+    
+    # Calculate the 10 highest funding rates within the last hour
+    highest_funding_rates = last_hour_df.groupby('name')['funding'].last().nlargest(10)
+    highest_10_names = highest_funding_rates.index.tolist()
+    
+    # Plotting
+    plt.figure(figsize=(12, 8))
+    for name in highest_10_names:
+        coin_data = last_hour_df[last_hour_df['name'] == name]
+        plt.plot(coin_data['timestamp'], coin_data['funding'], label=name, linestyle='-')
+    
+    plt.xlabel('Time')
+    plt.ylabel('Funding Rate')
+    plt.title('Highest 10 Funding Rates Over Last Hour')
+    plt.xticks(rotation=45)
+    plt.legend(title='Coin')
+    plt.tight_layout()
+    
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    await ctx.send(file=discord.File(fp=buffer, filename='funding_rates.png'))
+    plt.close()

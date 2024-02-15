@@ -167,7 +167,7 @@ class Info(API):
                 ]
             }
         """
-        return cast(Meta, self.post("/info", {"type": "meta"}))
+        return cast(Meta, self.post("/info", {"type": "metaAndAssetCtxs"}))
 
     def funding_history(self, coin: str, startTime: int, endTime: Optional[int] = None) -> Any:
         """Retrieve funding history for a given coin
